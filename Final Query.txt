@@ -1,0 +1,20 @@
+SELECT sts.CreatedOn AS 'Date',
+		sts.RequestTypeId AS 'RequestTypeId',
+		COUNT (DISTINCT sts.OperationID) AS '1', --'Total no.of SFV Triggered (transactions) '
+		COUNT (DISTINCT (CASE WHEN sts.AuthenticationMethod = 'pwd,sms' THEN sts.OperationID END)) AS 'la', -- No.of SFV Triggered - SMS OTP login'
+		COUNT (DISTINCT (CASE WHEN sts.AuthenticationMethod = 'pwd,swk' THEN sts.OperationID END)) AS '1b', --No.of SFV Triggered - QR logins, e-service shortcuts'
+		COUNT (DISTINCT sts.MemberID) AS '2', --'Total no.of unique users triggered SFV'
+		COUNT (DISTINCT (sts.MemberID)) -
+				COUNT(DISTINCT (CASE WHEN sts.IsSFVSuccess='Y' THEN sts.MemberID END))+
+				COUNT(DISTINCT (CASE WHEN sts.IsSFVSuccess= 'N' THEN sts.MemberID END)) AS '2a', --'No.of SFV drop out'
+		COUNT (DISTINCT (CASE WHEN sts.IsSFVSuccess='y' THEN sts.MemberID END) ) AS '2b', --'No.of successful SFV',
+		COUNT (DISTINCT (CASE WHEN sts.IsSFVSuccess= 'N' THEN sts.MemberID END)) AS '2c', 
+		COUNT (DISTINCT (CASE WHEN sts.ResponseStatusCode='400' THEN sts.MemberID END)) AS '3a',
+		COUNT (DISTINCT (CASE WHEN sts.ResponseStatusCode= '500' THEN sts.MemberID END)) AS '3b'
+FROM SfvStats sts WITH (NOLOCK)
+@{if(not(empty(pipeline().parameters.RequestTypeId)),concat('WHERE sts.RequestTypeId IN (',pipeline().parameters.RequestTypeId,')'),'')}
+@{if(and(empty(pipeline().parameters.RequestTypeId),and(not(empty(pipeline().parameters.StartDate)),not(empty(pipeline().parameters.EndDate)))),concat(' WHERE sts.CreatedOn BETWEEN CAST(''',pipeline().parameters.StartDate,''' AS DATE) AND CAST(''',pipeline().parameters.EndDate,''' AS DATE)'),'')}
+@{if(and(not(empty(pipeline().parameters.RequestTypeId)),and(not(empty(pipeline().parameters.StartDate)),not(empty(pipeline().parameters.EndDate)))),concat(' AND sts.CreatedOn BETWEEN CAST(''',pipeline().parameters.StartDate,''' AS DATE) AND CAST(''',pipeline().parameters.EndDate,''' AS DATE)'),'')}
+
+GROUP BY sts.RequestTypeId, sts.CreatedOn
+ORDER BY sts.RequestTypeId DESC, sts.Createdon
